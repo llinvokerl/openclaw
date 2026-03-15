@@ -205,11 +205,15 @@ export function loadSettings(): UiSettings {
     let raw = localStorage.getItem(storageKey);
 
     // Migration: if no data in new key and basePath is non-empty, try legacy key
-    if (!raw && basePath) {
+    // Legacy data represents the last-accessed basePath in old versions (which had a single shared key).
+    // We migrate it to the first non-root basePath accessed after upgrade.
+    if (!raw && basePath && !localStorage.getItem(KEY + ":migrated")) {
       raw = localStorage.getItem(KEY);
       if (raw) {
         // Copy old data to new key (preserve legacy key for root-path deployments)
         localStorage.setItem(storageKey, raw);
+        // Mark migration as done to prevent migrating the same data to multiple basePaths
+        localStorage.setItem(KEY + ":migrated", "true");
       }
     }
 

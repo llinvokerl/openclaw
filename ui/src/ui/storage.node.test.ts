@@ -639,6 +639,67 @@ describe("loadSettings default gateway URL derivation", () => {
     expect(rootSettings.splitRatio).toBe(0.6);
   });
 
+  it("migrates legacy settings to first-accessed non-root basePath only", async () => {
+    // Setup: legacy data in old key
+    setTestLocation({
+      protocol: "https:",
+      host: "example.com",
+      pathname: "/",
+    });
+    setControlUiBasePath(undefined);
+
+    localStorage.setItem(
+      "openclaw.control.settings.v1",
+      JSON.stringify({
+        gatewayUrl: "wss://example.com",
+        sessionKey: "legacy-session",
+        theme: "claw",
+        themeMode: "dark",
+        chatFocusMode: false,
+        chatShowThinking: true,
+        chatShowToolCalls: true,
+        splitRatio: 0.5,
+        navCollapsed: false,
+        navWidth: 200,
+        navGroupsCollapsed: {},
+      }),
+    );
+
+    // First non-root basePath access: /gateway-a/
+    vi.resetModules();
+    setTestLocation({
+      protocol: "https:",
+      host: "example.com",
+      pathname: "/gateway-a/chat",
+    });
+    setControlUiBasePath(undefined);
+
+    const { loadSettings: loadA } = await import("./storage.ts");
+    const settingsA = loadA();
+
+    // Verify migration happened to /gateway-a/
+    expect(localStorage.getItem("openclaw.control.settings.v1:/gateway-a")).toBeTruthy();
+    expect(settingsA.sessionKey).toBe("legacy-session");
+    expect(settingsA.splitRatio).toBe(0.5);
+
+    // Second non-root basePath access: /gateway-b/
+    vi.resetModules();
+    setTestLocation({
+      protocol: "https:",
+      host: "example.com",
+      pathname: "/gateway-b/chat",
+    });
+    setControlUiBasePath(undefined);
+
+    const { loadSettings: loadB } = await import("./storage.ts");
+    const settingsB = loadB();
+
+    // Verify migration did NOT happen to /gateway-b/ (already migrated once)
+    expect(localStorage.getItem("openclaw.control.settings.v1:/gateway-b")).toBeNull();
+    expect(settingsB.sessionKey).toBe("main"); // default
+    expect(settingsB.splitRatio).toBe(0.6); // default
+  });
+
   it("scopes persisted session selection per gateway", async () => {
     setTestLocation({
       protocol: "https:",
