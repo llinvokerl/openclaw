@@ -8,6 +8,14 @@ import { isSupportedLocale } from "../i18n/index.ts";
 import { inferBasePathFromPathname, normalizeBasePath } from "./navigation.ts";
 import { parseThemeSelection, type ThemeMode, type ThemeName } from "./theme.ts";
 
+function getEffectiveBasePath(): string {
+  const configured =
+    typeof window !== "undefined" &&
+    typeof window.__OPENCLAW_CONTROL_UI_BASE_PATH__ === "string" &&
+    window.__OPENCLAW_CONTROL_UI_BASE_PATH__.trim();
+  return configured ? normalizeBasePath(configured) : inferBasePathFromPathname(location.pathname);
+}
+
 function getStorageKey(basePath: string): string {
   const normalized = normalizeBasePath(basePath);
   return normalized ? `${KEY}:${normalized}` : KEY;
@@ -127,7 +135,7 @@ function persistSessionToken(gatewayUrl: string, token: string) {
 
 export function loadSettings(): UiSettings {
   const { pageUrl: pageDerivedUrl, effectiveUrl: defaultUrl } = deriveDefaultGatewayUrl();
-  const basePath = inferBasePathFromPathname(location.pathname);
+  const basePath = getEffectiveBasePath();
   const storageKey = getStorageKey(basePath);
 
   const defaults: UiSettings = {
@@ -231,7 +239,7 @@ export function saveSettings(next: UiSettings) {
 
 function persistSettings(next: UiSettings) {
   persistSessionToken(next.gatewayUrl, next.token);
-  const basePath = inferBasePathFromPathname(location.pathname);
+  const basePath = getEffectiveBasePath();
   const storageKey = getStorageKey(basePath);
   const persisted: PersistedUiSettings = {
     gatewayUrl: next.gatewayUrl,

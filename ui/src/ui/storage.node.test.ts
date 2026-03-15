@@ -491,4 +491,79 @@ describe("loadSettings default gateway URL derivation", () => {
     // Verify key remains unchanged (no migration)
     expect(localStorage.getItem("openclaw.control.settings.v1")).toBeTruthy();
   });
+
+  it("respects window.__OPENCLAW_CONTROL_UI_BASE_PATH__ global for storage key", async () => {
+    // Setup: pathname is "/" (root) but global is set to "/gateway-a"
+    setTestLocation({
+      protocol: "https:",
+      host: "example.com",
+      pathname: "/",
+    });
+    setControlUiBasePath("/gateway-a");
+
+    const { loadSettings, saveSettings } = await import("./storage.ts");
+
+    // Save settings
+    saveSettings({
+      gatewayUrl: "wss://example.com/gateway-a",
+      token: "token-a",
+      sessionKey: "session-a",
+      lastActiveSessionKey: "session-a",
+      theme: "claw",
+      themeMode: "dark",
+      chatFocusMode: false,
+      chatShowThinking: true,
+      chatShowToolCalls: true,
+      splitRatio: 0.5,
+      navCollapsed: false,
+      navWidth: 240,
+      navGroupsCollapsed: {},
+    });
+
+    // Verify storage key uses the global basePath, not the pathname
+    expect(localStorage.getItem("openclaw.control.settings.v1:/gateway-a")).toBeTruthy();
+    expect(localStorage.getItem("openclaw.control.settings.v1")).toBeNull();
+
+    // Verify loading also uses the same key
+    const loaded = loadSettings();
+    expect(loaded.sessionKey).toBe("session-a");
+    expect(loaded.splitRatio).toBe(0.5);
+  });
+
+  it("prefers window.__OPENCLAW_CONTROL_UI_BASE_PATH__ over pathname-inferred basePath", async () => {
+    // Setup: pathname suggests /some/path but global overrides to /gateway-b
+    setTestLocation({
+      protocol: "https:",
+      host: "example.com",
+      pathname: "/some/path/chat",
+    });
+    setControlUiBasePath("/gateway-b");
+
+    const { loadSettings, saveSettings } = await import("./storage.ts");
+
+    saveSettings({
+      gatewayUrl: "wss://example.com/gateway-b",
+      token: "token-b",
+      sessionKey: "session-b",
+      lastActiveSessionKey: "session-b",
+      theme: "dash",
+      themeMode: "light",
+      chatFocusMode: true,
+      chatShowThinking: false,
+      chatShowToolCalls: true,
+      splitRatio: 0.7,
+      navCollapsed: true,
+      navWidth: 300,
+      navGroupsCollapsed: {},
+    });
+
+    // Verify global basePath wins (not pathname-inferred /some/path)
+    expect(localStorage.getItem("openclaw.control.settings.v1:/gateway-b")).toBeTruthy();
+    expect(localStorage.getItem("openclaw.control.settings.v1:/some/path")).toBeNull();
+
+    // Verify load uses the same key
+    const loaded = loadSettings();
+    expect(loaded.sessionKey).toBe("session-b");
+    expect(loaded.splitRatio).toBe(0.7);
+  });
 });
